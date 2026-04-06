@@ -5,7 +5,7 @@ from modelscope import snapshot_download
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-MODEL_ID = "Qwen/Qwen3-4B"
+MODEL_ID = "qwen/Qwen3-4B"
 
 
 def clean_output(text: str) -> str:
