@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # 指向你刚才下载模型的文件夹路径，通常在当前目录下的 Qwen/Qwen3-14B-AWQ
-model_path = "./Qwen/Qwen3-14B-AWQ"
+model_path = "../Qwen/Qwen3-14B-AWQ"
 
 print("🚀 正在将 Qwen3-14B 注入 A10G 显存...")
 
