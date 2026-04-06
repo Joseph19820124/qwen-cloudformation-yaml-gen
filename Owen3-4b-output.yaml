@@ -1,0 +1,130 @@
+Resources:
+  NikeInventory:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: NikeInventory
+      AttributeDefinitions:
+        -AttributeName: InventoryID
+          AttributeType: S
+      KeySchema:
+        -AttributeName: InventoryID
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  NikeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      InlinePolicies:
+        LambdaBasicExecutionRole:
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource: '*'
+
+  NikeLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: NikeLambdaFunction
+      Handler: index.handler
+      Runtime: python3.9
+      Role: !Ref NikeLambdaRole
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('NikeInventory')
+
+          def handler(event, context):
+              item = event['body']
+              response = table.put_item(Item=item)
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({'message': 'Item added'})
+              }
+
+  NikeApiGateway:
+    Type: AWS::APIGateway::RestApi
+    Properties:
+      Name: NikeInventoryAPI
+      Description: API for Nike Inventory Management
+
+  NikeApiGatewayResource:
+    Type: AWS::APIGateway::Resource
+    Properties:
+      RestApiId: !Ref NikeApiGateway
+      PathPart: inventory
+      ParentId: !Ref NikeApiGatewayRoot
+
+  NikeApiGatewayMethod:
+    Type: AWS::APIGateway::Method
+    Properties:
+      RestApiId: !Ref NikeApiGateway
+      resourceId: !Ref NikeApiGatewayResource
+      HttpMethod: POST
+      Integration:
+        Type: Lambda
+        LambdaIntegration:
+          FunctionArn: !Ref NikeLambdaFunction
+
+  NikeApiGatewayMethodResponse:
+    Type: AWS::APIGateway::MethodResponse
+    Properties:
+      RestApiId: !Ref NikeApiGateway
+      resourceId: !Ref NikeApiGatewayResource
+      HttpMethod: POST
+      StatusCode: 200
+
+  NikeApiGatewayIntegrationResponse:
+    Type: AWS::APIGateway::IntegrationResponse
+    Properties:
+      RestApiId: !Ref NikeApiGateway
+      resourceId: !Ref NikeApiGatewayResource
+      HttpMethod: POST
+      ResponseTemplates:
+        application/json: |
+          {
+            "statusCode": 200,
+            "body": "$input.body$"
+          }
+      ResponseValidationBody: '{"message": "string"}'
+
+  NikeApiGatewayDeployment:
+    Type: AWS::APIGateway::Deployment
+    Properties:
+      RestApiId: !Ref NikeApiGateway
+      StageName: prod
+
+  NikeLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: NikeLambdaPolicy
+      Roles:
+        - !Ref NikeLambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - apigateway:Invoke
+            Resource: !Join [
+              '',
+              - 'arn:aws:apigateway:',
+              - !Ref AWS::Region,
+              - ':execute-api/',
+              - !Ref NikeApiGateway,
+              - '/*'
+            ]
